@@ -1,0 +1,206 @@
++*In[1]:*+
+[source, ipython3]
+----
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from datetime import datetime, timedelta
+import random
+
+# ----------------------------
+# STEP 1: Generate Synthetic Data
+# ----------------------------
+np.random.seed(42)
+num_customers = 2000
+
+# Generate customer IDs
+customer_ids = [f"CUST{i:04d}" for i in range(1, num_customers+1)]
+
+# Generate random purchase history
+dates = [datetime(2025, 1, 1) - timedelta(days=random.randint(1, 365)) for _ in range(num_customers)]
+frequency = np.random.randint(1, 50, num_customers)  # purchase count
+monetary = np.random.randint(100, 20000, num_customers)  # total spend in currency
+
+# Create DataFrame
+data = pd.DataFrame({
+    'CustomerID': customer_ids,
+    'LastPurchaseDate': dates,
+    'Frequency': frequency,
+    'Monetary': monetary
+})
+
+# Calculate Recency
+current_date = datetime(2025, 1, 1)
+data['Recency'] = data['LastPurchaseDate'].apply(lambda x: (current_date - x).days)
+
+# Drop LastPurchaseDate as we now have Recency
+data.drop('LastPurchaseDate', axis=1, inplace=True)
+
+print("Sample Data:")
+print(data.head())
+
+# ----------------------------
+# STEP 2: Feature Scaling
+# ----------------------------
+features = data[['Recency', 'Frequency', 'Monetary']]
+scaler = StandardScaler()
+scaled_features = scaler.fit_transform(features)
+
+# ----------------------------
+# STEP 3: Optimal Clusters (Elbow & Silhouette)
+# ----------------------------
+wcss = []
+silhouette_scores = []
+K = range(2, 11)
+for k in K:
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(scaled_features)
+    wcss.append(kmeans.inertia_)
+    silhouette_scores.append(silhouette_score(scaled_features, kmeans.labels_))
+
+# Plot Elbow Method
+plt.figure(figsize=(8,4))
+plt.plot(K, wcss, marker='o')
+plt.title('Elbow Method for Optimal k')
+plt.xlabel('Number of clusters (k)')
+plt.ylabel('WCSS')
+plt.show()
+
+# Plot Silhouette Scores
+plt.figure(figsize=(8,4))
+plt.plot(K, silhouette_scores, marker='o', color='green')
+plt.title('Silhouette Score for Different k')
+plt.xlabel('Number of clusters (k)')
+plt.ylabel('Silhouette Score')
+plt.show()
+
+# ----------------------------
+# STEP 4: Apply KMeans (Choose k=4 based on plots)
+# ----------------------------
+kmeans = KMeans(n_clusters=4, random_state=42)
+kmeans.fit(scaled_features)
+data['Cluster'] = kmeans.labels_
+
+# ----------------------------
+# STEP 5: Analyze Segments
+# ----------------------------
+segment_analysis = data.groupby('Cluster').agg({
+    'Recency': 'mean',
+    'Frequency': 'mean',
+    'Monetary': 'mean',
+    'CustomerID': 'count'
+}).rename(columns={'CustomerID': 'Num_Customers'})
+print("\nSegment Analysis:")
+print(segment_analysis)
+
+# ----------------------------
+# STEP 6: Visualization
+# ----------------------------
+sns.set(style="whitegrid")
+plt.figure(figsize=(8,6))
+sns.scatterplot(x='Frequency', y='Monetary', hue='Cluster', data=data, palette='tab10')
+plt.title('Customer Segments (Frequency vs Monetary)')
+plt.show()
+
+plt.figure(figsize=(8,6))
+sns.boxplot(x='Cluster', y='Recency', data=data, palette='Set2')
+plt.title('Recency Distribution by Cluster')
+plt.show()
+
+# Save segmented data
+data.to_csv('customer_segments.csv', index=False)
+print("\nData with clusters saved as 'customer_segments.csv'")
+
+----
+
+
++*Out[1]:*+
+----
+Sample Data:
+  CustomerID  Frequency  Monetary  Recency
+0   CUST0001         39      1660       83
+1   CUST0002         29     13712       18
+2   CUST0003         15     17750      288
+3   CUST0004         43     19911      182
+4   CUST0005          8      4880      349
+
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1412: FutureWarning: The default value of `n_init` will change from 10 to 'auto' in 1.4. Set the value of `n_init` explicitly to suppress the warning
+  super()._check_params_vs_input(X, default_n_init=10)
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1436: UserWarning: KMeans is known to have a memory leak on Windows with MKL, when there are less chunks than available threads. You can avoid it by setting the environment variable OMP_NUM_THREADS=8.
+  warnings.warn(
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1412: FutureWarning: The default value of `n_init` will change from 10 to 'auto' in 1.4. Set the value of `n_init` explicitly to suppress the warning
+  super()._check_params_vs_input(X, default_n_init=10)
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1436: UserWarning: KMeans is known to have a memory leak on Windows with MKL, when there are less chunks than available threads. You can avoid it by setting the environment variable OMP_NUM_THREADS=8.
+  warnings.warn(
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1412: FutureWarning: The default value of `n_init` will change from 10 to 'auto' in 1.4. Set the value of `n_init` explicitly to suppress the warning
+  super()._check_params_vs_input(X, default_n_init=10)
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1436: UserWarning: KMeans is known to have a memory leak on Windows with MKL, when there are less chunks than available threads. You can avoid it by setting the environment variable OMP_NUM_THREADS=8.
+  warnings.warn(
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1412: FutureWarning: The default value of `n_init` will change from 10 to 'auto' in 1.4. Set the value of `n_init` explicitly to suppress the warning
+  super()._check_params_vs_input(X, default_n_init=10)
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1436: UserWarning: KMeans is known to have a memory leak on Windows with MKL, when there are less chunks than available threads. You can avoid it by setting the environment variable OMP_NUM_THREADS=8.
+  warnings.warn(
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1412: FutureWarning: The default value of `n_init` will change from 10 to 'auto' in 1.4. Set the value of `n_init` explicitly to suppress the warning
+  super()._check_params_vs_input(X, default_n_init=10)
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1436: UserWarning: KMeans is known to have a memory leak on Windows with MKL, when there are less chunks than available threads. You can avoid it by setting the environment variable OMP_NUM_THREADS=8.
+  warnings.warn(
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1412: FutureWarning: The default value of `n_init` will change from 10 to 'auto' in 1.4. Set the value of `n_init` explicitly to suppress the warning
+  super()._check_params_vs_input(X, default_n_init=10)
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1436: UserWarning: KMeans is known to have a memory leak on Windows with MKL, when there are less chunks than available threads. You can avoid it by setting the environment variable OMP_NUM_THREADS=8.
+  warnings.warn(
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1412: FutureWarning: The default value of `n_init` will change from 10 to 'auto' in 1.4. Set the value of `n_init` explicitly to suppress the warning
+  super()._check_params_vs_input(X, default_n_init=10)
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1436: UserWarning: KMeans is known to have a memory leak on Windows with MKL, when there are less chunks than available threads. You can avoid it by setting the environment variable OMP_NUM_THREADS=8.
+  warnings.warn(
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1412: FutureWarning: The default value of `n_init` will change from 10 to 'auto' in 1.4. Set the value of `n_init` explicitly to suppress the warning
+  super()._check_params_vs_input(X, default_n_init=10)
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1436: UserWarning: KMeans is known to have a memory leak on Windows with MKL, when there are less chunks than available threads. You can avoid it by setting the environment variable OMP_NUM_THREADS=8.
+  warnings.warn(
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1412: FutureWarning: The default value of `n_init` will change from 10 to 'auto' in 1.4. Set the value of `n_init` explicitly to suppress the warning
+  super()._check_params_vs_input(X, default_n_init=10)
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1436: UserWarning: KMeans is known to have a memory leak on Windows with MKL, when there are less chunks than available threads. You can avoid it by setting the environment variable OMP_NUM_THREADS=8.
+  warnings.warn(
+
+![png](output_0_2.png)
+
+![png](output_0_3.png)
+
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1412: FutureWarning: The default value of `n_init` will change from 10 to 'auto' in 1.4. Set the value of `n_init` explicitly to suppress the warning
+  super()._check_params_vs_input(X, default_n_init=10)
+C:\Users\rawat\anaconda3\Lib\site-packages\sklearn\cluster\_kmeans.py:1436: UserWarning: KMeans is known to have a memory leak on Windows with MKL, when there are less chunks than available threads. You can avoid it by setting the environment variable OMP_NUM_THREADS=8.
+  warnings.warn(
+
+
+Segment Analysis:
+            Recency  Frequency      Monetary  Num_Customers
+Cluster                                                    
+0        223.594000  14.594000  15422.190000            500
+1         85.634195  35.850895  12043.403579            503
+2        279.176015  36.135397   7703.143133            517
+3        145.806250  13.454167   4874.222917            480
+
+![png](output_0_6.png)
+
+![png](output_0_7.png)
+
+
+Data with clusters saved as 'customer_segments.csv'
+----
+
+
++*In[ ]:*+
+[source, ipython3]
+----
+
+----
+
+
++*In[ ]:*+
+[source, ipython3]
+----
+
+----
